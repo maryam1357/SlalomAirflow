@@ -11,7 +11,8 @@ Slalom - Airflow Study Group Summary - Goals (WIP)
 WIP
 ## Deployment
 WIP
-#ETL
+##ETL
+WIP
 ## Table designs
 1. Normalized us city: built on city code data from raw airport and demographics data
 2. Normalized us airport: built on raw airport data, filtered for US airports, joined with ``city`` table to get ``city_id``
