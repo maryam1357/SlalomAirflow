@@ -15,12 +15,12 @@ default_args = {
 }
 
 #pipeline schedule
-pacific_time_three_am = '*/10 * * * *'
+every_10_minutes = '*/10 * * * *'
 
 dag = DAG(
     'demography_auto',
-    default_args=default_args,
-    schedule_interval=pacific_time_three_am
+    default_args = default_args,
+    schedule_interval = every_10_minutes
 )
 
 BQ_CONN_ID = "my_gcp_conn"
@@ -52,7 +52,8 @@ with dag:
         create_disposition='CREATE_IF_NEEDED',
         skip_leading_rows=1,        
         write_disposition='WRITE_TRUNCATE',
-        autodetect=True
+        autodetect=True,
+        field_delimiter=';'
     )
 
     #create city table drieved from Airpot table
@@ -66,7 +67,7 @@ with dag:
         (Select State_Code as State, City from airflow-slalom.sandbox.city_demographic 
         union all 
         Select SPLIT(iso_region, '-')[OFFSET(1)] State ,municipality as City from airflow-slalom.sandbox.Airport 
-        where iso_country = 'US') )WHERE row_number = 1 and State is not null and City is not null)
+        where iso_country = 'US') )WHERE row_number = 1 and State is not null and City is not null
         ''',
         use_legacy_sql = False,
         bigquery_con_id=BQ_CONN_ID
