@@ -2,21 +2,20 @@ from airflow import DAG
 import datetime as dt
 from airflow.operators.bash_operator import BashOperator
 from airflow.operators.python_operator import PythonOperator
-# from airflow.contrib.operators.gcs_to_bq import GoogleCloudStorageToBigQueryOperator
-# from airflow.contrib.operators.bigquery_operator import BigQueryOperator
+from airflow.contrib.operators.gcs_to_bq import GoogleCloudStorageToBigQueryOperator
+from airflow.contrib.operators.bigquery_operator import BigQueryOperator
 
 
 import pandas as pd
 
 def cull_table(input_file, output_file):
     ''' 
-    A tables of the number of cases per unique 
-    lat/long coordinate in host dataset. As of 03/31, host dataset has
-    255 rows each corresponding to a lat/long. Some rows have lat/long 0, 0
-    for cruise ships. Cull from dataset.
-
-    Input: Matrix with columns for each day starting 1/22/20. One row per lat/long.
-    Output: Matrix with columns for each lat/long. One row per day.
+    Basic transformation
+    Renameing column names
+    Removed unwanted columns from original file
+    Remove nans and unwanted lat/long rows
+    #To-Do: Reshape to optimize query times. (Create column for times with each row for a new day 
+    instead of column per time. )
     '''
     dataframe = pd.read_csv(input_file).fillna('')
     dataframe = dataframe.rename(columns = {'Province/State' : 'province_state', 'Country/Region' : 'country_region', 'Lat' : 'lat', 'Long' :'long'})
@@ -33,9 +32,7 @@ def cull_table(input_file, output_file):
     indices = dataframe.loc[dataframe['lat_long'] == '0.0, 0.0'].index
     dataframe = dataframe.drop(indices, axis = 0)
 
-    dataframe.to_csv(output_file)
-
-    return dataframe
+    dataframe.to_csv(output_file, index=False)
 
 file_paths =\
 [
@@ -44,10 +41,12 @@ file_paths =\
     'https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_deaths_global.csv',
 ]
 
-project_root = '/Users/kirit.thadaka/PersonalProjects/covid_analysis/'
-# project_root = '/home/airflow/gcs/data/'
+project_root = '/home/airflow/gcs/data/'
 raw_data_folder_path = project_root + 'raw_data'
 clean_data_folder_path = project_root + 'clean_data'
+
+bq_con_id = 'bigquery_default'
+gcs_con_id = 'bigquery_default'
 
 default_args =\
 {
@@ -112,53 +111,53 @@ transform_global_deaths = PythonOperator\
     dag=dag
 )
 
-# load_global_cases = GoogleCloudStorageToBigQueryOperator(
-#     task_id='load_global_cases',
-#     bucket='us-west3-corona-environment-e293b7ec-bucket',
-#     source_objects=['data/clean_data/global_cases_clean.csv'],
-#     bigquery_conn_id='bigquery_default',
-#     google_cloud_storage_conn_id='bigquery_default',
-#     destination_project_dataset_table='covid19.global_cases',
-#     source_format='CSV',
-#     create_disposition='CREATE_IF_NEEDED',
-#     skip_leading_rows=1,        
-#     write_disposition='WRITE_TRUNCATE',
-#     autodetect=True,
-#     dag=dag
-# )
+load_global_cases = GoogleCloudStorageToBigQueryOperator(
+    task_id='load_global_cases',
+    bucket='us-west3-corona-environment-e293b7ec-bucket',
+    source_objects=['data/clean_data/global_cases_clean.csv'],
+    bigquery_conn_id=bq_con_id,
+    google_cloud_storage_conn_id=gcs_con_id,
+    destination_project_dataset_table='covid19.global_cases',
+    source_format='CSV',
+    create_disposition='CREATE_IF_NEEDED',
+    skip_leading_rows=1,        
+    write_disposition='WRITE_TRUNCATE',
+    autodetect=True,
+    dag=dag
+)
 
-# load_global_recovered = GoogleCloudStorageToBigQueryOperator(
-#     task_id='load_global_recovered',
-#     bucket='us-west3-corona-environment-e293b7ec-bucket',
-#     source_objects=['data/clean_data/global_recovered_clean.csv'],
-#     bigquery_conn_id='bigquery_default',
-#     google_cloud_storage_conn_id='bigquery_default',
-#     destination_project_dataset_table='covid19.global_recovered',
-#     source_format='CSV',
-#     create_disposition='CREATE_IF_NEEDED',
-#     skip_leading_rows=1,        
-#     write_disposition='WRITE_TRUNCATE',
-#     autodetect=True,
-#     dag=dag
-# )
+load_global_recovered = GoogleCloudStorageToBigQueryOperator(
+    task_id='load_global_recovered',
+    bucket='us-west3-corona-environment-e293b7ec-bucket',
+    source_objects=['data/clean_data/global_recovered_clean.csv'],
+    bigquery_conn_id=bq_con_id,
+    google_cloud_storage_conn_id=gcs_con_id,
+    destination_project_dataset_table='covid19.global_recovered',
+    source_format='CSV',
+    create_disposition='CREATE_IF_NEEDED',
+    skip_leading_rows=1,        
+    write_disposition='WRITE_TRUNCATE',
+    autodetect=True,
+    dag=dag
+)
 
-# load_global_deaths = GoogleCloudStorageToBigQueryOperator(
-#     task_id='load_global_deaths',
-#     bucket='us-west3-corona-environment-e293b7ec-bucket',
-#     source_objects=['data/clean_data/global_deaths_clean.csv'],
-#     bigquery_conn_id='bigquery_default',
-#     google_cloud_storage_conn_id='bigquery_default',
-#     destination_project_dataset_table='covid19.global_deaths',
-#     source_format='CSV',
-#     create_disposition='CREATE_IF_NEEDED',
-#     skip_leading_rows=1,        
-#     write_disposition='WRITE_TRUNCATE',
-#     autodetect=True,
-#     dag=dag
-# )
+load_global_deaths = GoogleCloudStorageToBigQueryOperator(
+    task_id='load_global_deaths',
+    bucket='us-west3-corona-environment-e293b7ec-bucket',
+    source_objects=['data/clean_data/global_deaths_clean.csv'],
+    bigquery_conn_id=bq_con_id,
+    google_cloud_storage_conn_id=gcs_con_id,
+    destination_project_dataset_table='covid19.global_deaths',
+    source_format='CSV',
+    create_disposition='CREATE_IF_NEEDED',
+    skip_leading_rows=1,        
+    write_disposition='WRITE_TRUNCATE',
+    autodetect=True,
+    dag=dag
+)
 
 
-# download_confirmed_global >> transform_global_cases >> load_global_cases
-# download_recovered_global >> transform_global_recovered >> load_global_recovered
-# download_deaths_global >> transform_global_deaths >> load_global_deaths
+download_confirmed_global >> transform_global_cases >> load_global_cases
+download_recovered_global >> transform_global_recovered >> load_global_recovered
+download_deaths_global >> transform_global_deaths >> load_global_deaths
 
